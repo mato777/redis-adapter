@@ -23,8 +23,14 @@ if _src.is_dir() and str(_src) not in sys.path:
     sys.path.insert(0, str(_src))
 
 from cryptography.fernet import Fernet  # noqa: E402
+from pydantic import BaseModel  # noqa: E402
 
 from async_redis_client import CacheAsyncPort, RedisCacheAsyncAdapter  # noqa: E402
+
+
+class User(BaseModel):
+    id: int
+    name: str
 
 
 async def run_demo(cache: CacheAsyncPort) -> None:
@@ -35,6 +41,16 @@ async def run_demo(cache: CacheAsyncPort) -> None:
     await cache.set_many({"async:k1": "v1", "async:k2": "v2"}, ttl_seconds=60)
     many = await cache.get_many(["async:k1", "async:k2"])
     print("get_many:", many)
+
+    user = User(id=1, name="Ada")
+    await cache.set_model("user:1", user, ttl_seconds=3600)
+    loaded = await cache.get_as_model("user:1", User)
+    print("get_as_model(user:1):", loaded)
+
+    await cache.set_json("async:expires", {"ttl": True}, ttl_seconds=3)
+    await asyncio.sleep(4)
+    expired = await cache.get_json("async:expires")
+    print("get_json after TTL (expect None):", expired)
 
     total = await cache.incrby("counter:async_demo", 3)
     print("incrby:", total)
