@@ -15,13 +15,49 @@ Requirements: **Python ≥ 3.11**, **redis-py ≥ 7.4** (stable `redis` on PyPI)
 
 ## Install
 
+**PyPI distribution name:** `async-redis-client`  
+**Import name:** `async_redis_client`
+
+### In another project (uv)
+
+From Git (pin a tag or commit for reproducibility):
+
+```bash
+uv add "async-redis-client @ git+https://github.com/mato777/redis-adapter.git"
+```
+
+From a local checkout (editable, good for monorepos):
+
+```bash
+uv add --editable /path/to/async-redis-client
+```
+
+Then import the public API:
+
+```python
+from async_redis_client import CacheSyncPort, RedisCacheSyncAdapter
+```
+
+### pip / wheel
+
+```bash
+pip install "async-redis-client @ git+https://github.com/mato777/redis-adapter.git"
+# or, from a clone:
+pip install .
+```
+
+### Develop this repo
+
 Using [uv](https://docs.astral.sh/uv/) (recommended; `uv.lock` is in-repo):
 
 ```bash
+git clone https://github.com/mato777/redis-adapter.git
+cd redis-adapter
 uv sync
+uv run pytest
 ```
 
-Or install from the project wheel/sdist according to your workflow.
+`uv sync` installs the package in editable mode so `import async_redis_client` works immediately.
 
 ## Configuration
 
