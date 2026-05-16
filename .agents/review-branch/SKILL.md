@@ -3,7 +3,8 @@ name: review-branch
 description: >-
   Reviews the current git branch against its merge base (default main/master):
   runs the project test suite, then reports prioritized bugs (high/medium/low),
-  refactor suggestions, test gaps, edge cases, and performance concerns. Use when
+  refactor suggestions, test gaps, edge cases, performance concerns, and a
+  security pass (secrets, passwords, credentials). Use when
   the user asks for a branch review, code review of local changes, pre-merge review,
   or quality pass before a PR.
 ---
@@ -64,6 +65,10 @@ Use this structure (omit empty sections):
 ### Performance
 - Hot paths, N+1 / round-trips, unnecessary allocations, sync/blocking in async code, pipeline batching opportunities.
 
+### Security
+- Secrets / credentials: …
+- Other (injection, logging PII, unsafe deserialization): …
+
 ### Summary
 - 2–4 bullets: ship/no-ship recommendation and blockers.
 ```
@@ -76,10 +81,39 @@ Use this structure (omit empty sections):
 | **Medium** | Likely bugs on uncommon paths, misleading APIs, incomplete error handling, maintainability hazards |
 | **Low** | Style/nits, minor duplication, cosmetic naming, optional polish |
 
+## Security check (secrets, passwords, credentials)
+
+Run this on **every** branch review, on the full diff and any new/changed files (not only hunks).
+
+### What to scan for
+
+- **Hardcoded secrets** — API keys, tokens, passwords, private keys, connection strings with embedded credentials, `redis://` / `rediss://` URLs with user:pass, AWS/GCP/Azure keys, JWT signing secrets, webhook URLs with tokens.
+- **Committed env files** — `.env`, `.env.local`, `credentials.json`, `*.pem`, `id_rsa`, service-account JSON, kubeconfig with auth.
+- **Example / test leakage** — real-looking keys in fixtures, README snippets, launch configs, Docker Compose, CI YAML; prefer obvious fakes (`test-key`, `changeme`) and env vars.
+- **Logs and errors** — passwords, tokens, or full connection strings in `print`, logging, exception messages, or debug output.
+- **Client config** — `password=`, `username=`, `ssl_certfile` paths pointing at repo-local key material; ensure defaults are not production values.
+
+### How to check
+
+1. **Diff-first** — `git diff <base>...HEAD` for patterns: `password`, `secret`, `token`, `api_key`, `apikey`, `credential`, `private_key`, `BEGIN RSA`, `BEGIN OPENSSH`, `AKIA`, `ghp_`, `sk-`, `redis://.*:.*@`.
+2. **Repo search on touched paths** — if new config or auth code landed, grep changed directories for the same patterns and for filenames like `.env*`, `*secret*`, `*credential*`.
+3. **Dependencies** — new env vars documented without defaulting to real values; no secrets in `pyproject.toml`, `Dockerfile`, or workflow files unless using `${{ secrets.* }}` / CI secret refs only.
+
+### Severity
+
+| Finding | Priority |
+|---------|----------|
+| Real secret or production credential in repo | **High** — block merge; rotate if already pushed |
+| Plausible secret in tests/docs (could be real) | **Medium** — replace with fakes or env placeholders |
+| Risky pattern (logs password, URL in error) | **Medium**–**High** depending on exposure |
+| Missing `.gitignore` for `.env` when app reads env secrets | **Low**–**Medium** |
+
+If nothing is found, state explicitly: “No hardcoded secrets or credential files in diff.”
+
 ## Review dimensions (check explicitly)
 
 - **Correctness** — logic, types, error handling, resource cleanup (`close`/`aclose`).
-- **Security** — secrets, injection, unsafe deserialization, logging sensitive data.
+- **Security** — follow **Security check** above; plus injection, unsafe deserialization, logging sensitive data.
 - **Refactors** — smaller functions, clearer names, reduce duplication without changing behavior scope.
 - **Tests** — behavior-changing diff should have tests; property-style edge cases where cheap.
 - **Edge cases** — empty collections, `None`, TTL 0, cluster hash slots, decrypt/serialize failures.

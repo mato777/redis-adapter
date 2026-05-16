@@ -4,28 +4,19 @@ In-memory adapters for tests and local runs without Redis.
 MemoryCacheSyncAdapter / MemoryCacheAsyncAdapter implement the same port methods as the Redis
 adapters, but storage is process-local and TTL arguments are ignored.
 
-No Docker is required for this script::
+No Docker is required for this script. From the repo root::
 
+    uv sync
     uv run python examples/memory_cache_example.py
 """
 
 from __future__ import annotations
 
 import asyncio
-import sys
-from pathlib import Path
 
-_REPO_ROOT = Path(__file__).resolve().parents[1]
-_src = _REPO_ROOT / "src"
-if _src.is_dir() and str(_src) not in sys.path:
-    sys.path.insert(0, str(_src))
+from pydantic import BaseModel
 
-from pydantic import BaseModel  # noqa: E402
-
-from async_redis_client import (  # noqa: E402
-    MemoryCacheAsyncAdapter,
-    MemoryCacheSyncAdapter,
-)
+from async_redis_client import MemoryCacheAsyncAdapter, MemoryCacheSyncAdapter
 
 
 class Item(BaseModel):

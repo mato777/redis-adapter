@@ -20,6 +20,7 @@ Environment
 -----------
 REDIS_URL
     Connection URL for standalone Redis (default: redis://127.0.0.1:6379/0).
+    If your server uses a password: ``redis://:YOUR_PASSWORD@127.0.0.1:6379/0``.
 
 CACHE_FERNET_KEY / CACHE_FERNET_KEY_SECONDARY
     Optional. If unset, this example generates a random primary Fernet key in-process
@@ -29,20 +30,12 @@ CACHE_FERNET_KEY / CACHE_FERNET_KEY_SECONDARY
 from __future__ import annotations
 
 import os
-import sys
-from pathlib import Path
 
-# Allow `python examples/sync_redis_example.py` when the package isn't installed yet:
-_REPO_ROOT = Path(__file__).resolve().parents[1]
-_src = _REPO_ROOT / "src"
-if _src.is_dir() and str(_src) not in sys.path:
-    sys.path.insert(0, str(_src))
+from cryptography.fernet import Fernet
+from pydantic import BaseModel
+from redis import Redis
 
-from cryptography.fernet import Fernet  # noqa: E402
-from pydantic import BaseModel  # noqa: E402
-from redis import Redis  # noqa: E402
-
-from async_redis_client import CacheSyncPort, RedisCacheSyncAdapter  # noqa: E402
+from async_redis_client import CacheSyncPort, RedisCacheSyncAdapter
 
 
 class User(BaseModel):

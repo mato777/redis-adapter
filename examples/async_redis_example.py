@@ -8,27 +8,24 @@ Prerequisites
 Start Redis (see examples/Dockerfile), install the project (`uv sync`), then::
 
     REDIS_URL=redis://127.0.0.1:6379/0 uv run python examples/async_redis_example.py
+
+Use a passworded URL when required (``redis://:password@host:6379/0``).
 """
 
 from __future__ import annotations
 
 import asyncio
 import os
-import sys
-from pathlib import Path
 
-_REPO_ROOT = Path(__file__).resolve().parents[1]
-_src = _REPO_ROOT / "src"
-if _src.is_dir() and str(_src) not in sys.path:
-    sys.path.insert(0, str(_src))
+from cryptography.fernet import Fernet
+from pydantic import BaseModel
 
-from cryptography.fernet import Fernet  # noqa: E402
-from pydantic import BaseModel  # noqa: E402
-
-from async_redis_client import CacheAsyncPort, RedisCacheAsyncAdapter  # noqa: E402
+from async_redis_client import CacheAsyncPort, RedisCacheAsyncAdapter
 
 
 class User(BaseModel):
+    """Small model illustrating async set_model / get_as_model."""
+
     id: int
     name: str
 
@@ -46,11 +43,6 @@ async def run_demo(cache: CacheAsyncPort) -> None:
     await cache.set_model("user:1", user, ttl_seconds=3600)
     loaded = await cache.get_as_model("user:1", User)
     print("get_as_model(user:1):", loaded)
-
-    await cache.set_json("async:expires", {"ttl": True}, ttl_seconds=3)
-    await asyncio.sleep(4)
-    expired = await cache.get_json("async:expires")
-    print("get_json after TTL (expect None):", expired)
 
     total = await cache.incrby("counter:async_demo", 3)
     print("incrby:", total)
