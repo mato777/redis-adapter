@@ -10,7 +10,7 @@ from async_redis_client.adapters.redis._pubsub_helpers import (
     full_channel,
     logical_channel,
 )
-from async_redis_client.pubsub_message import PubSubMessage
+from async_redis_client.schemas import PubSubMessage
 
 
 class MemoryPubSubHub:

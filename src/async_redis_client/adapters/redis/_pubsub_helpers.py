@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from async_redis_client.pubsub_message import PubSubMessage
+from async_redis_client.schemas import PubSubMessage
 
 
 def full_channel(channel_prefix: str, channel: str) -> str:

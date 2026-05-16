@@ -6,7 +6,7 @@ from typing import Self
 
 from async_redis_client.adapters.memory._pubsub_hub import AsyncMemoryPubSubHub
 from async_redis_client.errors import PubSubClosedError
-from async_redis_client.pubsub_message import PubSubMessage
+from async_redis_client.schemas import PubSubMessage
 
 
 class MemoryPubSubSubscriptionAsyncAdapter:

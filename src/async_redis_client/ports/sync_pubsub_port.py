@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import Protocol
 
-from async_redis_client.pubsub_message import PubSubMessage
+from async_redis_client.schemas import PubSubMessage
 
 
 class PubSubSubscriptionSyncPort(Protocol):

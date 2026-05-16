@@ -37,6 +37,12 @@ from async_redis_client.errors import (
     PubSubError,
     SerializationError,
 )
+from async_redis_client.messaging import (
+    PubSubConsumerAsync,
+    PubSubConsumerSync,
+    PubSubProducerAsync,
+    PubSubProducerSync,
+)
 from async_redis_client.ports.async_cache_port import CacheAsyncPort
 from async_redis_client.ports.async_pubsub_port import (
     PubSubAsyncPort,
@@ -47,7 +53,7 @@ from async_redis_client.ports.sync_pubsub_port import (
     PubSubSubscriptionSyncPort,
     PubSubSyncPort,
 )
-from async_redis_client.pubsub_message import PubSubMessage
+from async_redis_client.schemas import PubSubMessage
 
 SyncCachePort = CacheSyncPort
 AsyncCachePort = CacheAsyncPort
@@ -69,9 +75,13 @@ __all__ = [
     "MemoryPubSubAsyncAdapter",
     "MemoryPubSubSyncAdapter",
     "PubSubAsyncPort",
+    "PubSubConsumerAsync",
+    "PubSubConsumerSync",
     "PubSubClosedError",
     "PubSubError",
     "PubSubMessage",
+    "PubSubProducerAsync",
+    "PubSubProducerSync",
     "PubSubSubscriptionAsyncPort",
     "PubSubSubscriptionSyncPort",
     "PubSubSyncPort",

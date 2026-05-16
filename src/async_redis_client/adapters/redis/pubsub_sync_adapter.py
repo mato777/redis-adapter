@@ -13,7 +13,7 @@ from async_redis_client.adapters.redis._pubsub_helpers import (
     parse_pubsub_message,
 )
 from async_redis_client.errors import PubSubClosedError
-from async_redis_client.pubsub_message import PubSubMessage
+from async_redis_client.schemas import PubSubMessage
 
 RedisSyncClient = Redis | RedisCluster
 

@@ -95,7 +95,7 @@ extend-select = [
 ignore = []
 
 [tool.ruff.lint.isort]
-known-first-party = ["async_redis_client"]
+known-first-party = ["async_redis_client", "async_redis_client.schemas"]
 
 [tool.ty.environment]
 python-version = "3.11"

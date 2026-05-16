@@ -186,7 +186,23 @@ async def main():
 asyncio.run(main())
 ```
 
-Sync: **`RedisPubSubSyncAdapter`** with **`subscribe`**, **`psubscribe`**, **`publish`**, and **`PubSubMessage`**. See **`examples/pubsub_example.py`**.
+Sync: **`RedisPubSubSyncAdapter`** with **`subscribe`**, **`psubscribe`**, **`publish`**, and **`PubSubMessage`**.
+
+**Typed producer / consumer** (Pydantic or dataclass payloads, handler dependency injection):
+
+```python
+from async_redis_client import PubSubProducerAsync, PubSubConsumerAsync, RedisPubSubAsyncAdapter
+
+async def on_order(event: OrderCreated, db: Session) -> None:
+    ...
+
+async with RedisPubSubAsyncAdapter.from_standalone_url(url) as bus:
+    producer = PubSubProducerAsync(bus, "orders", OrderCreated)
+    consumer = PubSubConsumerAsync(bus, "orders", OrderCreated, on_order, db=session)
+    await producer.publish(OrderCreated(order_id=1, sku="X"))
+```
+
+See **`examples/pubsub_example.py`**.
 
 ### Errors
 

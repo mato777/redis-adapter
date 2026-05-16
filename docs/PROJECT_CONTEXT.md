@@ -4,19 +4,37 @@ Use this file when resuming work on **async-redis-client**: goals, stack, design
 
 ## Goal
 
-A **Ports and Adapters (hexagonal)** cache library: **application code depends on cache ports** (`typing.Protocol`); **Redis (or an in-memory stand-in) implements those ports** behind the scenes.
+A **Ports and Adapters (hexagonal)** library for **cache** and **pub/sub**: application code depends on **`typing.Protocol`** ports; **Redis** (sync or asyncio) or **in-memory** adapters implement them in the composition root.
+
+### Cache
 
 - **Two clients**: synchronous and asynchronous redis-py clients, plus **memory adapters** for tests and simple local use.
 - **Topology**: **standalone** and **Redis Cluster** by **injecting** the right redis-py client at startup into `RedisCacheSyncAdapter` / `RedisCacheAsyncAdapter`, or via **`from_standalone_url`** / **`from_cluster_url`**.
 - **Connection lifecycle**: build **`Redis`/`RedisCluster`** (and async equivalents) or their pools in the **composition root**; inject into adapters.
 - **Cluster hash slots**: multi-key **`set_many`** / **`get_many`** use a pipeline / `MGET`; on Cluster, keys must share a hash slot (hash tags in **`namespace`** / **`key_prefix`** / logical keys, e.g. `{tenant}:item:1`).
 - **Key naming**: optional **`namespace`** then **`key_prefix`** are concatenated before the logical key port methods receive — physical Redis key is **`namespace + key_prefix +`** logical key (same composition on memory adapters for parity).
-- **Encryption**: in **Redis adapters** — values at encrypted keys are **Fernet** ciphertext; plaintext before encrypt is **UTF-8 JSON bytes** via **Pydantic v2** (`dump_json` / `validate_json` for `JsonValue`, `TypeAdapter` for models). **Optional secondary Fernet key** (`CACHE_FERNET_KEY_SECONDARY` / `fernet_key_secondary`): decrypt retries with the legacy key after primary fails (rotation); **writes always use the primary key only**.
+- **Encryption**: in **Redis cache adapters** — values at encrypted keys are **Fernet** ciphertext; plaintext before encrypt is **UTF-8 JSON bytes** via **Pydantic v2** (`dump_json` / `validate_json` for `JsonValue`, `TypeAdapter` for models). **Optional secondary Fernet key** (`CACHE_FERNET_KEY_SECONDARY` / `fernet_key_secondary`): decrypt retries with the legacy key after primary fails (rotation); **writes always use the primary key only**.
 - **JSON helpers**: `set_json` / `get_json` are aliases of `set` / `get`.
 - **Typed hydration**: `set_model` / `get_as_model` using **`model_dump_json()`**-derived bytes and **`TypeAdapter(typ).validate_json()`**.
 - **TTL** on writes (`SET ... EX ttl` / async equivalent).
 - **Atomic counters**: `incr` / `decr` / `incrby` — **plaintext Redis integers** only (no Fernet on counter keys); use a dedicated prefix (e.g. `counter:`).
-- **Pub/sub (v0.2+)**: **`PubSubSyncPort` / `PubSubAsyncPort`** with Redis and memory adapters; **`publish`**, **`subscribe`**, **`psubscribe`**, optional **`channel_prefix`**; **`PubSubMessage`** payloads.
+
+### Pub/sub (v0.2+)
+
+Low-level **ports** mirror Redis pub/sub:
+
+- **`PubSubSyncPort`** / **`PubSubAsyncPort`** — `publish`, `subscribe`, `psubscribe`, `close`.
+- **`PubSubSubscription*Port`** — `get_message`, `listen`, `unsubscribe`, `close`.
+- Optional **`channel_prefix`** on Redis/memory adapters (same idea as cache `key_prefix`).
+- Wire payloads: **`PubSubMessage`** (`schemas/pubsub_message.py`) — `channel`, `data`, optional `pattern` for `pmessage`.
+
+**Typed messaging** (application-facing, built on pub/sub ports):
+
+- **`PubSubProducerSync`** / **`PubSubProducerAsync`** — encode **Pydantic `BaseModel`** or **dataclass** as JSON and publish.
+- **`PubSubConsumerSync`** / **`PubSubConsumerAsync`** — subscribe, decode, call a user **handler**; extra deps (`db`, cache, …) passed as constructor kwargs and matched to handler parameter **names** (validated at consumer construction).
+- One class per file under **`messaging/`** (`producer_sync.py`, `producer_async.py`, `consumer_sync.py`, `consumer_async.py`); shared **`codec.py`** and **`_invoke.py`**.
+
+Example: **`examples/pubsub_example.py`**.
 
 ## Stack (as in `pyproject.toml`)
 
@@ -25,12 +43,13 @@ A **Ports and Adapters (hexagonal)** cache library: **application code depends o
 | Language | Python **≥ 3.11** |
 | Package manager | **uv** (`uv.lock` present) |
 | Build | **uv_build** |
+| Version | **0.2.0** |
 | Redis client | **redis** (redis-py) **≥ 7.4** (latest stable on PyPI) — optional **`hiredis`** not declared; add if you want the parser speedup |
-| Redis server (Docker / e2e) | **Redis 8** (`redis:8-alpine` in `examples/Dockerfile`, root `Dockerfile`, and `test_redis_e2e.py`) |
+| Redis server (Docker / e2e) | **Redis 8** (`redis:8-alpine` in root `Dockerfile`, `test_redis_e2e.py`, `test_pubsub_e2e.py`) |
 | Crypto | **cryptography** (Fernet) |
 | JSON / models | **pydantic** v2 |
 
-**Dev:** `pytest`, `pytest-asyncio`, `fakeredis`, `pytest-sugar`, **`pytest-cov`**, **`ruff`**, **`taskipy`** (see `[tool.taskipy.tasks]`), **`testcontainers[redis]`** (Docker e2e), **`ty`** (type checks with repo overrides).
+**Dev:** `pytest`, `pytest-asyncio`, `fakeredis`, `pytest-sugar`, **`pytest-cov`**, **`ruff`**, **`taskipy`** (see `[tool.taskipy.tasks]`), **`testcontainers[redis]`** (Docker e2e), **`ty`** (type checks with repo overrides on `adapters/redis/**` and `tests/**`).
 
 ## Bootstrap / dev
 
@@ -49,62 +68,77 @@ The package lives at **`src/async_redis_client/`** (see layout below).
 
 | Layer | Role |
 |-------|------|
-| **Port** | **`CacheSyncPort`** / **`CacheAsyncPort`**; **`PubSubSyncPort`** / **`PubSubAsyncPort`** (`ports/*_pubsub_port.py`) — `typing.Protocol`, **no `redis` imports**. **`ports/cache_port.py`** / **`ports/pubsub_port.py`** re-export for compat. |
+| **Cache port** | **`CacheSyncPort`**, **`CacheAsyncPort`** — `ports/sync_cache_port.py`, `ports/async_cache_port.py`; **`ports/cache_port.py`** re-exports (compat). |
+| **Pub/sub port** | **`PubSubSyncPort`**, **`PubSubAsyncPort`**, subscription ports — `ports/sync_pubsub_port.py`, `ports/async_pubsub_port.py`; **`ports/pubsub_port.py`** re-exports (compat). |
 | **Redis adapter** | Cache: **`RedisCacheSyncAdapter`**, **`RedisCacheAsyncAdapter`**. Pub/sub: **`RedisPubSubSyncAdapter`**, **`RedisPubSubAsyncAdapter`**. |
 | **Memory adapter** | Cache: **`MemoryCacheSyncAdapter`**, **`MemoryCacheAsyncAdapter`**. Pub/sub: **`MemoryPubSubSyncAdapter`**, **`MemoryPubSubAsyncAdapter`**. |
-| **Composition root** | App bootstrap builds redis clients + adapters, injects **ports** into services. |
+| **Messaging** | Not ports — **`PubSubProducer*`**, **`PubSubConsumer*`** depend on pub/sub ports only. |
+| **Composition root** | Bootstrap builds redis clients + adapters; inject **ports** (or messaging wrappers) into services. |
 
-Serialization, encryption, and topology stay **inside adapters** (or their classmethods), not in domain code.
+Serialization, encryption, and topology stay **inside adapters** (or messaging codec), not in domain code.
 
 ## Redis Cluster
 
 - Adapters accept **standalone or cluster** clients as above.
 - **Single-key** operations are cluster-safe as usual (MOVED/ASK handled by redis-py).
 - **`set_many` / `get_many`**: same hash-slot requirement as any multi-key command on Cluster; adapter does not validate slots — failures surface as Redis errors.
+- **Pub/sub on Cluster** has Redis-specific fan-out semantics; library does not abstract slot routing for channels.
 
 ## Testing (current repo)
 
-- **Redis adapters (unit-style):** **`fakeredis`** / **`FakeAsyncRedis`** in `tests/test_redis_sync_adapter.py` and `tests/test_redis_async_adapter.py` (JSON, models, TTL, counters, secondary-key decrypt, wrong key / bad blob, `set_many` / `get_many`, `namespace` / `key_prefix`).
-- **Crypto:** `tests/test_crypto.py` (env keys, primary/secondary decrypt behavior).
-- **Memory:** `tests/test_memory_async_adapter.py` (async JSON, strict getters, concurrency-oriented cases); sync memory covered via sync/redis-focused tests as applicable.
-- **E2E:** `tests/test_redis_e2e.py` — real **Redis 8** in Docker via **`testcontainers[redis]`**, marked **`pytest.mark.e2e`** (skip with `-m "not e2e"` if no daemon).
-- **Cluster-specific** integration tests for hash-slot validation remain optional; not a dedicated cluster job in-tree beyond adapter semantics.
+- **Cache (Redis, unit-style):** `tests/test_redis_sync_adapter.py`, `tests/test_redis_async_adapter.py` — **fakeredis** / **FakeAsyncRedis** (JSON, models, TTL, counters, secondary-key decrypt, batch, `namespace` / `key_prefix`).
+- **Cache (memory):** `tests/test_memory_async_adapter.py` and sync coverage via redis/memory tests.
+- **Pub/sub (Redis, unit-style):** `tests/test_redis_pubsub_sync_adapter.py`, `tests/test_redis_pubsub_async_adapter.py` — fakeredis.
+- **Pub/sub (memory):** `tests/test_memory_pubsub_adapter.py`.
+- **Pub/sub (helpers):** `tests/test_pubsub_helpers.py`.
+- **Messaging:** `tests/test_messaging_codec.py`, `tests/test_messaging_producer_consumer.py` — codec + producer/consumer with memory bus and dependency injection.
+- **Crypto:** `tests/test_crypto.py`.
+- **E2E cache:** `tests/test_redis_e2e.py` — **Redis 8** via **testcontainers**, `pytest.mark.e2e`.
+- **E2E pub/sub:** `tests/test_pubsub_e2e.py` — same container fixture, sync + async roundtrip.
+- **Cluster-specific** hash-slot integration tests remain optional.
 
 ## Public API (implemented)
 
-Re-exported from **`async_redis_client`** (see `src/async_redis_client/__init__.py`): ports, errors (**`CacheKeyNotFoundError`** included), **`RedisCacheSyncAdapter`**, **`RedisCacheAsyncAdapter`**, **`MemoryCacheSyncAdapter`**, **`MemoryCacheAsyncAdapter`**, plus aliases **`SyncCachePort`** / **`AsyncCachePort`**.
+Re-exported from **`async_redis_client`** (see `src/async_redis_client/__init__.py`).
 
-**Encrypted JSON / model paths**
+**Ports (aliases):** `SyncCachePort`, `AsyncCachePort`, `SyncPubSubPort`, `AsyncPubSubPort`, plus `CacheSyncPort`, `CacheAsyncPort`, `PubSubSyncPort`, `PubSubAsyncPort`, subscription port types.
 
-- `set` / `get` — `JsonValue` round-trip (encrypt/decrypt).
-- `set_json` / `get_json` — same as `set` / `get`.
-- `get_or_raise_if_missing` / `get_json_or_raise_if_missing` — same decryption path as `get`, but raise **`CacheKeyNotFoundError`** when **no blob is stored** (JSON `null` still counts as present).
-- `set_model` / `get_as_model`.
-- `delete`, `exists`.
-- `set_many` / `get_many` — batch pipeline + `MGET` semantics; Cluster hash-slot rules apply.
+**Cache adapters:** `RedisCacheSyncAdapter`, `RedisCacheAsyncAdapter`, `MemoryCacheSyncAdapter`, `MemoryCacheAsyncAdapter`.
 
-**Counters** (plaintext)
+**Pub/sub adapters:** `RedisPubSubSyncAdapter`, `RedisPubSubAsyncAdapter`, `MemoryPubSubSyncAdapter`, `MemoryPubSubAsyncAdapter`.
 
-- `incr`, `decr`, `incrby`.
+**Messaging:** `PubSubProducerSync`, `PubSubProducerAsync`, `PubSubConsumerSync`, `PubSubConsumerAsync`.
 
-**Factories (Redis only)**
+**Schemas:** `PubSubMessage`.
 
-- `from_standalone_url`, `from_cluster_url` (sync and async), with **`fernet_key`** / **`fernet_key_secondary`** / **`namespace`** / **`key_prefix`** mirroring the constructors.
+**Errors:** `CacheError`, `CacheClosedError`, `CacheKeyNotFoundError`, `DecryptionError`, `SerializationError`, `PubSubError`, `PubSubClosedError`.
+
+### Cache API summary
+
+- Encrypted JSON: `set` / `get`, `set_json` / `get_json`, strict getters, `set_model` / `get_as_model`, `delete`, `exists`, `set_many` / `get_many`.
+- Counters (plaintext): `incr`, `decr`, `incrby`.
+- Factories: `from_standalone_url`, `from_cluster_url` with `fernet_*`, `namespace`, `key_prefix`.
+
+### Pub/sub API summary
+
+- Low-level: `publish(channel, bytes|str)`, `subscribe` / `psubscribe` → subscription with `get_message` / `listen`.
+- Messaging: `producer.publish(typed_message)`, `consumer.run(max_messages=…, stop_event=…)` (async).
 
 ## Configuration
 
-- **Fernet key**: env **`CACHE_FERNET_KEY`** (urlsafe base64 ASCII) and/or constructor **`fernet_key: bytes`** — explicit key wins (`crypto.build_fernet`).
-- **Secondary Fernet key (rotation)**: env **`CACHE_FERNET_KEY_SECONDARY`** and/or **`fernet_key_secondary: bytes`** — used only for decrypt fallback (`crypto.build_secondary_fernet` / `decrypt_bytes`).
-- **`namespace`**: optional string placed **before** **`key_prefix`** in the physical key (Redis and memory adapters).
-- **`key_prefix`**: optional string between **`namespace`** and the logical key (Redis and memory adapters).
+- **Fernet key**: env **`CACHE_FERNET_KEY`** and/or constructor **`fernet_key: bytes`** — explicit key wins (`crypto.build_fernet`).
+- **Secondary Fernet key (rotation)**: env **`CACHE_FERNET_KEY_SECONDARY`** and/or **`fernet_key_secondary: bytes`** — decrypt fallback only.
+- **`namespace`** / **`key_prefix`**: cache physical keys (Redis + memory).
+- **`channel_prefix`**: pub/sub physical channel names (Redis + memory).
 
 ## Errors
 
-- **`CacheError`** base — configuration problems such as a missing Fernet key when building an adapter.
-- **`CacheKeyNotFoundError`** — strict JSON reads via **`get_or_raise_if_missing`** / **`get_json_or_raise_if_missing`** when the key has **no stored JSON ciphertext** (Redis **`GET`** miss or memory JSON slot absent).
-- **`DecryptionError`** — bad/truncated Fernet token (decrypt attempted because Redis returned a value).
-- **`SerializationError`** — wraps Pydantic **`ValidationError`** (and related value errors) after decrypt for a stable public surface.
-- **Key not found (optional)**: plain **`get`** / **`get_json`** / **`get_as_model`** return **`None`**; **`get_many`** maps each missing logical key to **`None`**. Use **`get_or_raise_if_missing`** when callers prefer an exception over **`None`**. Invalid ciphertext / JSON after a hit still raises **`DecryptionError`** / **`SerializationError`**.
+- **`CacheError`** / **`PubSubError`** — base types for each area.
+- **`CacheClosedError`** / **`PubSubClosedError`** — use after adapter (or subscription) close.
+- **`CacheKeyNotFoundError`** — strict cache JSON reads when key absent.
+- **`DecryptionError`** — invalid Fernet token on cache read.
+- **`SerializationError`** — Pydantic validation failure (cache decrypt path or pub/sub message decode).
+- Optional cache misses: plain `get*` returns **`None`**; invalid ciphertext/JSON after hit raises **`DecryptionError`** / **`SerializationError`**.
 
 ## Module layout (current)
 
@@ -113,21 +147,43 @@ Under **`src/async_redis_client/`**:
 | Path | Role |
 |------|------|
 | `__init__.py` | Public exports |
+| `errors.py` | Cache + pub/sub exceptions |
+| `crypto.py` | Fernet build/encrypt/decrypt |
+| `serialization.py` | Cache JSON/model bytes |
+| `schemas/pubsub_message.py` | **`PubSubMessage`** dataclass |
+| `schemas/__init__.py` | Re-export **`PubSubMessage`** |
 | `ports/sync_cache_port.py` | **`CacheSyncPort`** |
 | `ports/async_cache_port.py` | **`CacheAsyncPort`** |
-| `ports/cache_port.py` | Re-exports sync + async ports (compat) |
-| `errors.py` | **`CacheError`**, **`CacheKeyNotFoundError`**, **`DecryptionError`**, **`SerializationError`** |
-| `crypto.py` | Env + **`build_fernet`**, **`build_secondary_fernet`**, **`encrypt_bytes`**, **`decrypt_bytes`** (primary + optional secondary) |
-| `serialization.py` | **`dump_json_value`**, **`load_json_value`**, **`dump_model`**, **`load_as_type`** |
+| `ports/sync_pubsub_port.py` | **`PubSubSyncPort`**, **`PubSubSubscriptionSyncPort`** |
+| `ports/async_pubsub_port.py` | **`PubSubAsyncPort`**, **`PubSubSubscriptionAsyncPort`** |
+| `ports/cache_port.py` / `ports/pubsub_port.py` | Compat re-exports |
 | `adapters/redis/sync_adapter.py` | **`RedisCacheSyncAdapter`** |
 | `adapters/redis/async_adapter.py` | **`RedisCacheAsyncAdapter`** |
+| `adapters/redis/pubsub_sync_adapter.py` | **`RedisPubSubSyncAdapter`** (+ subscription class) |
+| `adapters/redis/pubsub_async_adapter.py` | **`RedisPubSubAsyncAdapter`** (+ subscription class) |
+| `adapters/redis/_helpers.py` | Cache key/pipeline helpers |
+| `adapters/redis/_pubsub_helpers.py` | Channel prefix, parse Redis pub/sub dicts |
 | `adapters/memory/sync_adapter.py` | **`MemoryCacheSyncAdapter`** |
 | `adapters/memory/async_adapter.py` | **`MemoryCacheAsyncAdapter`** |
+| `adapters/memory/pubsub_sync_adapter.py` | **`MemoryPubSubSyncAdapter`** |
+| `adapters/memory/pubsub_async_adapter.py` | **`MemoryPubSubAsyncAdapter`** |
+| `adapters/memory/_pubsub_hub.py` | In-process fan-out for memory pub/sub |
+| `messaging/codec.py` | Encode/decode typed messages (JSON) |
+| `messaging/_invoke.py` | Handler binding + dependency validation |
+| `messaging/producer_sync.py` | **`PubSubProducerSync`** |
+| `messaging/producer_async.py` | **`PubSubProducerAsync`** |
+| `messaging/consumer_sync.py` | **`PubSubConsumerSync`** |
+| `messaging/consumer_async.py` | **`PubSubConsumerAsync`** |
+| `messaging/__init__.py` | Re-export all four messaging classes |
 
-## Out of scope (v1)
+**Examples:** `examples/sync_redis_example.py`, `examples/async_redis_example.py`, `examples/memory_cache_example.py`, `examples/pubsub_example.py`.
+
+## Out of scope
 
 - KMS / centralized key lifecycle beyond **constructor/env dual-key decrypt** (`fernet_key_secondary`), compression before encrypt.
 - **Redis Sentinel** as a first-class factory (same inject-a-client pattern can be added later).
+- **FastAPI / web framework** integration in the library (use messaging + ports in app bootstrap).
+- Durable queues, consumer groups, or **Redis Streams** (use pub/sub for fire-and-forget notifications only).
 
 ## Related docs
 
@@ -138,7 +194,8 @@ Under **`src/async_redis_client/`**:
 
 - [ ] Optional **`hiredis`** dependency if benchmarks justify it.
 - [ ] Docker / CI job explicitly exercising **Redis Cluster** + `set_many` / `get_many` hash-slot behavior (beyond standalone e2e).
+- [ ] E2E test for **typed messaging** (`PubSubProducerAsync` + `PubSubConsumerAsync`) against real Redis (today covered via memory + fakeredis + low-level pub/sub e2e).
 
 ---
 
-*Last aligned with the repo: **async-redis-client** v0.1.0 — hexagonal ports (`sync`/`async` modules + compat `cache_port`), Redis + memory adapters, optional **`namespace`** + **`key_prefix`** physical keys, Fernet primary/secondary decrypt, Pydantic JSON, plaintext counters, batch helpers, fakeredis + crypto tests, optional Docker e2e via testcontainers.*
+*Last aligned with the repo: **async-redis-client** v0.2.0 — cache + pub/sub ports, Redis + memory adapters, `schemas/`, typed **messaging** (four producer/consumer modules), Fernet cache encryption, Pydantic JSON, fakeredis + messaging tests, Docker e2e for cache and pub/sub via testcontainers.*
