@@ -1,21 +1,44 @@
 [project]
 name = "async-redis-client"
 version = "0.1.0"
-description = "Add your description here"
+description = "Hexagonal cache library with sync/async Redis adapters, Fernet encryption, and Pydantic JSON."
 readme = "README.md"
 authors = [
     { name = "mato777", email = "matias@landjourney.ai" }
 ]
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
+keywords = ["redis", "cache", "async", "fernet", "pydantic", "hexagonal"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Database",
+    "Topic :: Software Development :: Libraries",
+    "Typing :: Typed",
+]
 dependencies = [
     "cryptography>=48.0.0",
     "pydantic>=2.13.4",
     "redis>=7.4.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/mato777/redis-adapter"
+Repository = "https://github.com/mato777/redis-adapter"
+Documentation = "https://github.com/mato777/redis-adapter#readme"
+Issues = "https://github.com/mato777/redis-adapter/issues"
+
 [build-system]
 requires = ["uv_build>=0.11.14,<0.12.0"]
 build-backend = "uv_build"
+
+[tool.uv]
+package = true
 
 [dependency-groups]
 dev = [
@@ -34,7 +57,8 @@ dev = [
 lint = "uv run ruff check src tests"
 format = "uv run ruff format src tests"
 format-check = "uv run ruff format --check src tests"
-test = "uv run pytest"
+test = "uv run pytest -m \"not e2e\""
+test-all = "uv run pytest"
 test-cov = "uv run pytest --cov=async_redis_client --cov-report=term-missing --cov-report=html"
 install-git-hooks = "git config core.hooksPath .githooks"
 

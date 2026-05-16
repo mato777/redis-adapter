@@ -6,6 +6,13 @@ or :class:`~async_redis_client.ports.async_cache_port.CacheAsyncPort` only; comp
 in your bootstrap layer.
 """
 
+from importlib.metadata import PackageNotFoundError, version
+
+try:
+    __version__ = version("async-redis-client")
+except PackageNotFoundError:
+    __version__ = "0.0.0+unknown"
+
 from async_redis_client.adapters.memory import (
     MemoryCacheAsyncAdapter,
     MemoryCacheSyncAdapter,
@@ -28,6 +35,7 @@ SyncCachePort = CacheSyncPort
 AsyncCachePort = CacheAsyncPort
 
 __all__ = [
+    "__version__",
     "AsyncCachePort",
     "CacheAsyncPort",
     "CacheClosedError",
