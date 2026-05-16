@@ -1,6 +1,6 @@
 # async-redis-client
 
-A small **Ports and Adapters (hexagonal)** cache library for Python: application code depends on **`CacheSyncPort` / `CacheAsyncPort`** (`typing.Protocol`); **Redis** (sync or asyncio) **or an in-memory implementation** satisfies those protocols behind the scenes.
+A small **Ports and Adapters (hexagonal)** cache and **pub/sub** library for Python: application code depends on **`CacheSyncPort` / `CacheAsyncPort`** and **`PubSubSyncPort` / `PubSubAsyncPort`** (`typing.Protocol`); **Redis** (sync or asyncio) **or in-memory implementations** satisfy those protocols behind the scenes.
 
 **Features:**
 
@@ -10,6 +10,7 @@ A small **Ports and Adapters (hexagonal)** cache library for Python: application
 - **Plaintext integer counters** (`incr`, `decr`, `incrby`)—keep counter keys separate from encrypted JSON keys (for example a `counter:` prefix).
 - **`set_many` / `get_many`** via pipeline/`MGET` semantics—on **Redis Cluster**, keys must land in the **same hash slot** (use hash tags in keys or `key_prefix`, e.g. `{tenant}:item:1`).
 - **Memory adapters** for fast tests and local use (`MemoryCacheSyncAdapter`, `MemoryCacheAsyncAdapter`).
+- **Sync and async pub/sub** (`RedisPubSubSyncAdapter`, `RedisPubSubAsyncAdapter`, memory counterparts) with optional **`channel_prefix`** (same idea as cache `key_prefix`).
 
 Requirements: **Python ≥ 3.11**, **redis-py ≥ 7.4** (stable `redis` on PyPI), **cryptography**, **pydantic ≥ 2**. Example and e2e Docker images use **Redis 8** server (`redis:8-alpine`).
 
@@ -167,13 +168,34 @@ cache.set_json("x", {"n": 1})
 assert cache.get_json("x") == {"n": 1}
 ```
 
+### Pub/sub (async)
+
+```python
+import asyncio
+from async_redis_client import RedisPubSubAsyncAdapter
+
+async def main():
+    async with RedisPubSubAsyncAdapter.from_standalone_url(
+        "redis://localhost:6379/0", decode_responses=True
+    ) as bus:
+        sub = await bus.subscribe("events")
+        await bus.publish("events", "hello")
+        msg = await sub.get_message(timeout=2.0)
+        await sub.close()
+
+asyncio.run(main())
+```
+
+Sync: **`RedisPubSubSyncAdapter`** with **`subscribe`**, **`psubscribe`**, **`publish`**, and **`PubSubMessage`**. See **`examples/pubsub_example.py`**.
+
 ### Errors
 
-- **`CacheError`** — missing key / bootstrap issues (for example unset Fernet key).
+- **`CacheError`** / **`PubSubError`** — configuration and adapter errors.
+- **`CacheClosedError`** / **`PubSubClosedError`** — use after close.
 - **`DecryptionError`** — invalid Fernet token.
 - **`SerializationError`** — wraps Pydantic validation problems after decryption.
 
-Public exports are documented in **`async_redis_client.__init__.__all__`** (ports, adapters, errors, and **`SyncCachePort` / `AsyncCachePort`** aliases).
+Public exports are documented in **`async_redis_client.__init__.__all__`** (ports, adapters, errors, and **`SyncCachePort` / `AsyncCachePort` / `SyncPubSubPort` / `AsyncPubSubPort`** aliases).
 
 ## Development
 

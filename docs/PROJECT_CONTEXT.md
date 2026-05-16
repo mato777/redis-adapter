@@ -16,6 +16,7 @@ A **Ports and Adapters (hexagonal)** cache library: **application code depends o
 - **Typed hydration**: `set_model` / `get_as_model` using **`model_dump_json()`**-derived bytes and **`TypeAdapter(typ).validate_json()`**.
 - **TTL** on writes (`SET ... EX ttl` / async equivalent).
 - **Atomic counters**: `incr` / `decr` / `incrby` — **plaintext Redis integers** only (no Fernet on counter keys); use a dedicated prefix (e.g. `counter:`).
+- **Pub/sub (v0.2+)**: **`PubSubSyncPort` / `PubSubAsyncPort`** with Redis and memory adapters; **`publish`**, **`subscribe`**, **`psubscribe`**, optional **`channel_prefix`**; **`PubSubMessage`** payloads.
 
 ## Stack (as in `pyproject.toml`)
 
@@ -48,9 +49,9 @@ The package lives at **`src/async_redis_client/`** (see layout below).
 
 | Layer | Role |
 |-------|------|
-| **Port** | **`CacheSyncPort`** (`ports/sync_cache_port.py`), **`CacheAsyncPort`** (`ports/async_cache_port.py`) — `typing.Protocol`, **no `redis` imports**; what application code depends on. **`ports/cache_port.py`** re-exports both for backward compatibility. |
-| **Redis adapter** | **`RedisCacheSyncAdapter`** (`adapters/redis/sync_adapter.py`), **`RedisCacheAsyncAdapter`** (`adapters/redis/async_adapter.py`) — Fernet + Pydantic; accept `Redis \| RedisCluster` (sync) or `redis.asyncio` equivalents (async). |
-| **Memory adapter** | **`MemoryCacheSyncAdapter`**, **`MemoryCacheAsyncAdapter`** — in-process port implementation for unit/domain tests (`TTL` args ignored on memory); **`namespace`** / **`key_prefix`** match Redis physical-key rules. |
+| **Port** | **`CacheSyncPort`** / **`CacheAsyncPort`**; **`PubSubSyncPort`** / **`PubSubAsyncPort`** (`ports/*_pubsub_port.py`) — `typing.Protocol`, **no `redis` imports**. **`ports/cache_port.py`** / **`ports/pubsub_port.py`** re-export for compat. |
+| **Redis adapter** | Cache: **`RedisCacheSyncAdapter`**, **`RedisCacheAsyncAdapter`**. Pub/sub: **`RedisPubSubSyncAdapter`**, **`RedisPubSubAsyncAdapter`**. |
+| **Memory adapter** | Cache: **`MemoryCacheSyncAdapter`**, **`MemoryCacheAsyncAdapter`**. Pub/sub: **`MemoryPubSubSyncAdapter`**, **`MemoryPubSubAsyncAdapter`**. |
 | **Composition root** | App bootstrap builds redis clients + adapters, injects **ports** into services. |
 
 Serialization, encryption, and topology stay **inside adapters** (or their classmethods), not in domain code.
