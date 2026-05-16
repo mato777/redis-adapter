@@ -183,3 +183,7 @@ uv run pytest
 ```
 
 More design notes and module layout: [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) and [docs/PLAN.md](docs/PLAN.md).
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
