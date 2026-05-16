@@ -43,3 +43,23 @@ def test_memory_sync_pattern() -> None:
         assert msg.pattern == "event*"
     finally:
         sub.close()
+
+
+@pytest.mark.asyncio
+async def test_memory_async_pattern() -> None:
+    bus = MemoryPubSubAsyncAdapter()
+    sub = await bus.psubscribe("event*")
+    try:
+        assert await bus.publish("events", "async-p") == 1
+        msg = await sub.get_message(timeout=1.0)
+        assert msg is not None
+        assert msg.pattern == "event*"
+        assert msg.data == "async-p"
+    finally:
+        await sub.close()
+
+
+def test_memory_sync_rejects_multiple_channels() -> None:
+    bus = MemoryPubSubSyncAdapter()
+    with pytest.raises(ValueError, match="one channel"):
+        bus.subscribe("a", "b")

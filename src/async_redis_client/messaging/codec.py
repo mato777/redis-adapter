@@ -5,7 +5,7 @@ from typing import TypeVar
 
 from pydantic import BaseModel, TypeAdapter
 
-from async_redis_client.errors import SerializationError
+from async_redis_client.errors import PubSubSerializationError
 
 TMessage = TypeVar("TMessage")
 
@@ -28,6 +28,6 @@ def decode_message(message_type: type[TMessage], data: str | bytes) -> TMessage:
     try:
         return TypeAdapter(message_type).validate_json(raw)
     except Exception as exc:
-        raise SerializationError(
+        raise PubSubSerializationError(
             f"Pub/sub payload failed validation as {message_type!r}."
         ) from exc

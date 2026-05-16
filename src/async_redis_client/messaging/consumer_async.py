@@ -19,8 +19,13 @@ class PubSubConsumerAsync(Generic[TMessage]):
     """
     Async consumer with dependency injection for handler parameters (``db``, etc.).
 
-    Handlers may be sync or async. Use :meth:`run` in a task; cancel the task, set
-    ``max_messages``, or set ``stop_event`` to stop.
+    Handlers may be sync or async. The **first parameter** (in signature order) is the
+    decoded message; use a plain function or :func:`functools.partial`, not a bound method.
+
+    Handler and decode errors propagate and stop :meth:`run`. Invalid JSON raises
+    :class:`~async_redis_client.errors.PubSubSerializationError`. Use :meth:`run` in a
+    task; cancel the task, set ``max_messages``, or set ``stop_event`` to stop. Close
+    subscriptions explicitly before closing the bus adapter.
     """
 
     __slots__ = ("_bus", "_channel", "_message_type", "_handler", "_dependencies")

@@ -60,6 +60,7 @@ class MemoryPubSubSyncAdapter:
     In-memory :class:`~async_redis_client.ports.sync_pubsub_port.PubSubSyncPort` for unit tests.
 
     Fan-out is process-local; there is no network or Redis semantics beyond channel names.
+    Unlike Redis, each ``subscribe`` / ``psubscribe`` accepts **one** channel or pattern only.
     """
 
     __slots__ = ("_hub", "_closed")

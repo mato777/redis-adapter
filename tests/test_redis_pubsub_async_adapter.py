@@ -66,3 +66,14 @@ async def test_async_closed_adapter_raises(
     await async_pubsub.close()
     with pytest.raises(PubSubClosedError):
         await async_pubsub.publish("x", "y")
+
+
+@pytest.mark.asyncio
+async def test_close_adapter_before_subscription(
+    async_pubsub: RedisPubSubAsyncAdapter,
+) -> None:
+    sub = await async_pubsub.subscribe("orphan")
+    await async_pubsub.close()
+    with pytest.raises(PubSubClosedError):
+        await async_pubsub.publish("orphan", "late")
+    await sub.close()

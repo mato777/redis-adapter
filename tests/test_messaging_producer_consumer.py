@@ -13,6 +13,7 @@ from async_redis_client import (
     PubSubConsumerSync,
     PubSubProducerAsync,
     PubSubProducerSync,
+    PubSubSerializationError,
 )
 
 
@@ -106,3 +107,61 @@ def test_consumer_missing_dependency_raises() -> None:
 
     with pytest.raises(TypeError, match="missing required parameters"):
         PubSubConsumerSync(bus, "x", Ping, needs_db)
+
+
+def test_consumer_rejects_bound_method() -> None:
+    bus = MemoryPubSubSyncAdapter()
+
+    class Svc:
+        def on_ping(self, msg: Ping) -> None:
+            pass
+
+    with pytest.raises(TypeError, match="plain function"):
+        PubSubConsumerSync(bus, "x", Ping, Svc().on_ping)
+
+
+@pytest.mark.asyncio
+async def test_async_consumer_invalid_json_raises() -> None:
+    bus = MemoryPubSubAsyncAdapter()
+    seen: list[Ping] = []
+
+    async def on_ping(msg: Ping) -> None:
+        seen.append(msg)
+
+    consumer = PubSubConsumerAsync(bus, "bad", Ping, on_ping)
+    task = asyncio.create_task(consumer.run(max_messages=1))
+    await asyncio.sleep(0.05)
+    await bus.publish("bad", b"not-json")
+    with pytest.raises(PubSubSerializationError):
+        await asyncio.wait_for(task, timeout=2.0)
+    assert seen == []
+
+
+def test_sync_consumer_rejects_async_handler() -> None:
+    bus = MemoryPubSubSyncAdapter()
+
+    async def async_handler(_: Ping) -> None:
+        pass
+
+    consumer = PubSubConsumerSync(bus, "x", Ping, async_handler)
+    producer = PubSubProducerSync(bus, "x", Ping)
+
+    import threading
+    import time
+
+    errors: list[BaseException] = []
+
+    def run_consumer() -> None:
+        try:
+            consumer.run(max_messages=1)
+        except BaseException as exc:
+            errors.append(exc)
+
+    thread = threading.Thread(target=run_consumer)
+    thread.start()
+    time.sleep(0.05)
+    producer.publish(Ping(text="x"))
+    thread.join(timeout=2.0)
+    assert len(errors) == 1
+    assert isinstance(errors[0], TypeError)
+    assert "async handlers" in str(errors[0])

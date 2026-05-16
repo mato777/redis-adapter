@@ -35,6 +35,7 @@ from async_redis_client.errors import (
     DecryptionError,
     PubSubClosedError,
     PubSubError,
+    PubSubSerializationError,
     SerializationError,
 )
 from async_redis_client.messaging import (
@@ -79,6 +80,7 @@ __all__ = [
     "PubSubConsumerSync",
     "PubSubClosedError",
     "PubSubError",
+    "PubSubSerializationError",
     "PubSubMessage",
     "PubSubProducerAsync",
     "PubSubProducerSync",

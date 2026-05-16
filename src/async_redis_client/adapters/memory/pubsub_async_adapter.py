@@ -62,6 +62,9 @@ class MemoryPubSubSubscriptionAsyncAdapter:
 class MemoryPubSubAsyncAdapter:
     """
     In-memory :class:`~async_redis_client.ports.async_pubsub_port.PubSubAsyncPort` for unit tests.
+
+    Each ``subscribe`` / ``psubscribe`` accepts **one** channel or pattern (Redis allows many).
+    The hub is not thread-safe; use one event loop / task set per adapter instance.
     """
 
     __slots__ = ("_hub", "_closed")

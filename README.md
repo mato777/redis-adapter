@@ -204,12 +204,15 @@ async with RedisPubSubAsyncAdapter.from_standalone_url(url) as bus:
 
 See **`examples/pubsub_example.py`**.
 
+Consumers expect a **plain function** (first parameter = message); use `functools.partial` instead of bound methods. Handler or decode errors stop `run()`; there is no built-in retry. **`MemoryPubSub*Adapter`** allows one channel per `subscribe` (Redis allows several).
+
 ### Errors
 
 - **`CacheError`** / **`PubSubError`** — configuration and adapter errors.
 - **`CacheClosedError`** / **`PubSubClosedError`** — use after close.
-- **`DecryptionError`** — invalid Fernet token.
-- **`SerializationError`** — wraps Pydantic validation problems after decryption.
+- **`DecryptionError`** — invalid Fernet token on cache read.
+- **`SerializationError`** — Pydantic validation failure after cache decrypt.
+- **`PubSubSerializationError`** — invalid typed pub/sub JSON in consumers.
 
 Public exports are documented in **`async_redis_client.__init__.__all__`** (ports, adapters, errors, and **`SyncCachePort` / `AsyncCachePort` / `SyncPubSubPort` / `AsyncPubSubPort`** aliases).
 

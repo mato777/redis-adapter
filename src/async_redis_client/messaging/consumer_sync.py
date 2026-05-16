@@ -21,6 +21,13 @@ class PubSubConsumerSync(Generic[TMessage]):
     Pass extra dependencies (database session, cache port, etc.) as keyword arguments
     to the constructor; they are forwarded to ``handler`` when the parameter names match.
 
+    The **first parameter** of ``handler`` (in signature order) receives the decoded message.
+    Use a plain function or :func:`functools.partial`, not a bound instance method.
+
+    Handler and decode errors propagate and stop :meth:`run` (no skip/retry). Invalid JSON
+    raises :class:`~async_redis_client.errors.PubSubSerializationError`. Close the
+    subscription when finished; closing the bus adapter does not auto-close subscriptions.
+
     Example::
 
         def on_order(event: OrderCreated, db: Session) -> None:

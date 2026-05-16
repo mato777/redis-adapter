@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import pytest
 from pydantic import BaseModel
 
-from async_redis_client.errors import SerializationError
+from async_redis_client.errors import PubSubSerializationError
 from async_redis_client.messaging.codec import decode_message, encode_message
 
 
@@ -38,5 +38,5 @@ def test_encode_rejects_plain_object() -> None:
 
 
 def test_decode_invalid_json_raises() -> None:
-    with pytest.raises(SerializationError):
+    with pytest.raises(PubSubSerializationError):
         decode_message(EventModel, b"not-json")

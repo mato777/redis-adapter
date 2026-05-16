@@ -5,20 +5,37 @@ from collections.abc import Callable
 from typing import Any
 
 
-def _message_parameter_name(handler: Callable[..., Any]) -> str:
-    sig = inspect.signature(handler)
+def _reject_bound_method(handler: Callable[..., Any]) -> None:
+    if inspect.ismethod(handler):
+        raise TypeError(
+            "handler must be a plain function or functools.partial, not a bound method; "
+            "pass dependencies via consumer kwargs instead"
+        )
+
+
+def _handler_signature(handler: Callable[..., Any]) -> inspect.Signature:
+    return inspect.signature(handler)
+
+
+def _message_parameter_name(sig: inspect.Signature) -> str:
     if not sig.parameters:
         raise TypeError("handler must accept at least one parameter (the message)")
-    return next(iter(sig.parameters))
+    name = next(iter(sig.parameters))
+    if name in ("self", "cls"):
+        raise TypeError(
+            "handler must be a plain function or functools.partial, not a method; "
+            "pass dependencies via consumer kwargs instead"
+        )
+    return name
 
 
 def _missing_dependency_names(
-    handler: Callable[..., Any],
+    sig: inspect.Signature,
+    message_name: str,
     dependencies: dict[str, Any],
 ) -> list[str]:
-    message_name = _message_parameter_name(handler)
     missing: list[str] = []
-    for name, param in inspect.signature(handler).parameters.items():
+    for name, param in sig.parameters.items():
         if name == message_name:
             continue
         if name in dependencies:
@@ -37,7 +54,10 @@ def validate_handler_dependencies(
     handler: Callable[..., Any],
     dependencies: dict[str, Any],
 ) -> None:
-    missing = _missing_dependency_names(handler, dependencies)
+    _reject_bound_method(handler)
+    sig = _handler_signature(handler)
+    message_name = _message_parameter_name(sig)
+    missing = _missing_dependency_names(sig, message_name, dependencies)
     if missing:
         raise TypeError(
             f"handler is missing required parameters {missing!r}; "
@@ -50,14 +70,16 @@ def _bind_handler_kwargs(
     message: object,
     dependencies: dict[str, Any],
 ) -> dict[str, Any]:
-    message_name = _message_parameter_name(handler)
+    _reject_bound_method(handler)
+    sig = _handler_signature(handler)
+    message_name = _message_parameter_name(sig)
     bound: dict[str, Any] = {message_name: message}
 
     for name, value in dependencies.items():
-        if name in inspect.signature(handler).parameters and name != message_name:
+        if name in sig.parameters and name != message_name:
             bound[name] = value
 
-    missing = _missing_dependency_names(handler, dependencies)
+    missing = _missing_dependency_names(sig, message_name, dependencies)
     if missing:
         raise TypeError(
             f"handler is missing required parameters {missing!r}; "

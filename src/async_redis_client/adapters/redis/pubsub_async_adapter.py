@@ -86,7 +86,8 @@ class RedisPubSubAsyncAdapter:
     Async Redis pub/sub implementing :class:`~async_redis_client.ports.async_pubsub_port.PubSubAsyncPort`.
 
     **Lifecycle:** URL factories set ``owns_client=True``; use ``async with adapter:`` or await
-    :meth:`close`. :meth:`aclose` is an alias of :meth:`close`.
+    :meth:`close`. :meth:`aclose` is an alias of :meth:`close`. Close each subscription before
+    closing this adapter; open subscriptions are not tracked automatically.
     """
 
     __slots__ = ("_client", "_channel_prefix", "_owns_client", "_closed")

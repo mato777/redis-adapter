@@ -89,6 +89,8 @@ class RedisPubSubSyncAdapter:
     dedicated :class:`~redis.client.PubSub` connection; close each subscription when finished.
 
     **Lifecycle:** URL factories set ``owns_client=True``; use ``with adapter:`` or :meth:`close`.
+    Each ``subscribe`` opens a dedicated PubSub connection—call :meth:`~RedisPubSubSubscriptionSyncAdapter.close`
+    on every subscription before :meth:`close` on this adapter.
     """
 
     __slots__ = ("_client", "_channel_prefix", "_owns_client", "_closed")

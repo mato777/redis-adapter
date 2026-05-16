@@ -13,6 +13,10 @@ class PubSubClosedError(PubSubError):
     """Raised when a pub/sub operation runs after the adapter or subscription is closed."""
 
 
+class PubSubSerializationError(PubSubError):
+    """Raised when a pub/sub payload fails Pydantic/dataclass JSON validation."""
+
+
 class CacheClosedError(CacheError):
     """Raised when a cache operation runs after the adapter has been closed."""
 
@@ -32,4 +36,4 @@ class DecryptionError(CacheError):
 
 
 class SerializationError(CacheError):
-    """Raised when JSON/model validation fails after decrypt."""
+    """Raised when JSON/model validation fails after cache decrypt."""

@@ -31,7 +31,7 @@ Low-level **ports** mirror Redis pub/sub:
 **Typed messaging** (application-facing, built on pub/sub ports):
 
 - **`PubSubProducerSync`** / **`PubSubProducerAsync`** — encode **Pydantic `BaseModel`** or **dataclass** as JSON and publish.
-- **`PubSubConsumerSync`** / **`PubSubConsumerAsync`** — subscribe, decode, call a user **handler**; extra deps (`db`, cache, …) passed as constructor kwargs and matched to handler parameter **names** (validated at consumer construction).
+- **`PubSubConsumerSync`** / **`PubSubConsumerAsync`** — subscribe, decode, call a user **handler** (plain function; first parameter = message); extra deps (`db`, cache, …) passed as constructor kwargs and matched to handler parameter **names** (validated at consumer construction). Handler/decode errors stop `run()`; invalid JSON → **`PubSubSerializationError`**.
 - One class per file under **`messaging/`** (`producer_sync.py`, `producer_async.py`, `consumer_sync.py`, `consumer_async.py`); shared **`codec.py`** and **`_invoke.py`**.
 
 Example: **`examples/pubsub_example.py`**.
@@ -111,7 +111,7 @@ Re-exported from **`async_redis_client`** (see `src/async_redis_client/__init__.
 
 **Schemas:** `PubSubMessage`.
 
-**Errors:** `CacheError`, `CacheClosedError`, `CacheKeyNotFoundError`, `DecryptionError`, `SerializationError`, `PubSubError`, `PubSubClosedError`.
+**Errors:** `CacheError`, `CacheClosedError`, `CacheKeyNotFoundError`, `DecryptionError`, `SerializationError`, `PubSubError`, `PubSubClosedError`, `PubSubSerializationError`.
 
 ### Cache API summary
 
@@ -137,7 +137,8 @@ Re-exported from **`async_redis_client`** (see `src/async_redis_client/__init__.
 - **`CacheClosedError`** / **`PubSubClosedError`** — use after adapter (or subscription) close.
 - **`CacheKeyNotFoundError`** — strict cache JSON reads when key absent.
 - **`DecryptionError`** — invalid Fernet token on cache read.
-- **`SerializationError`** — Pydantic validation failure (cache decrypt path or pub/sub message decode).
+- **`SerializationError`** — Pydantic validation failure after cache decrypt.
+- **`PubSubSerializationError`** — typed pub/sub payload failed JSON/model validation in consumers.
 - Optional cache misses: plain `get*` returns **`None`**; invalid ciphertext/JSON after hit raises **`DecryptionError`** / **`SerializationError`**.
 
 ## Module layout (current)
