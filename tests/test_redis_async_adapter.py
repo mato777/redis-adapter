@@ -33,6 +33,18 @@ async def test_async_json_roundtrip(async_redis: RedisCacheAsyncAdapter) -> None
 
 
 @pytest.mark.asyncio
+async def test_async_namespace_only(fernet_key: bytes) -> None:
+    import fakeredis
+
+    r = fakeredis.FakeAsyncRedis(decode_responses=False)
+    cache = RedisCacheAsyncAdapter(r, fernet_key=fernet_key, namespace="ns:")
+    await cache.set_json("x", 2)
+    raw = await r.get(b"ns:x")
+    assert raw is not None
+    assert await cache.get_json("x") == 2
+
+
+@pytest.mark.asyncio
 async def test_async_namespace_plus_key_prefix(fernet_key: bytes) -> None:
     import fakeredis
 

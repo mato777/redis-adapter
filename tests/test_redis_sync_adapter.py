@@ -61,6 +61,17 @@ def test_sync_key_prefix(fernet_key: bytes) -> None:
     assert raw is not None
 
 
+def test_sync_namespace_only(fernet_key: bytes) -> None:
+    import fakeredis
+
+    r = fakeredis.FakeRedis(decode_responses=False)
+    cache = RedisCacheSyncAdapter(r, fernet_key=fernet_key, namespace="myapp:")
+    cache.set_json("k", 1)
+    raw = r.get(b"myapp:k")
+    assert raw is not None
+    assert cache.get_json("k") == 1
+
+
 def test_sync_namespace_plus_key_prefix(fernet_key: bytes) -> None:
     import fakeredis
 
