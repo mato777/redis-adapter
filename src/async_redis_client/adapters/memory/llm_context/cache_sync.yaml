@@ -1,0 +1,24 @@
+symbol: MemoryCacheSyncAdapter
+kind: adapter
+protocol: CacheSyncPort
+module: async_redis_client.adapters.memory.sync_adapter
+file: adapters/memory/sync_adapter.py
+import: from async_redis_client import MemoryCacheSyncAdapter
+init: {namespace: "", key_prefix: ""}
+storage:
+  _json: dict physical_key -> JsonValue
+  _models: dict physical_key -> BaseModel instance
+  _counters: dict physical_key -> int
+physical_key: namespace + key_prefix + logical_key
+diff_vs_redis:
+  - no Fernet; plaintext in-memory
+  - ttl_seconds accepted ignored
+  - close no-op
+  - set_model stores instance not encrypted bytes
+  - wrong API on key type raises SerializationError not DecryptionError
+collision_rules:
+  - one storage kind per key; incr clears json/model on key
+  - get on model key -> SerializationError use get_as_model
+  - get on counter key -> SerializationError use incr
+set_many|get_many: sequential per key; no cluster slot rules
+tests: [tests/test_memory_sync_adapter.py, tests/test_memory_async_adapter.py]

@@ -1,0 +1,11 @@
+purpose: Redis-backed port implementations (redis-py inject or URL factories).
+ports: ../ports/llm_context/
+files:
+  cache_sync.yaml: RedisCacheSyncAdapter
+  cache_async.yaml: RedisCacheAsyncAdapter
+  pubsub_sync.yaml: RedisPubSubSyncAdapter + RedisPubSubSubscriptionSyncAdapter
+  pubsub_async.yaml: RedisPubSubAsyncAdapter + RedisPubSubSubscriptionAsyncAdapter
+helpers: [_helpers.py cache keys/pipeline, _pubsub_helpers.py channel prefix + parse]
+env:
+  CACHE_FERNET_KEY: primary encrypt/decrypt
+  CACHE_FERNET_KEY_SECONDARY: decrypt fallback only; writes always primary

@@ -45,3 +45,21 @@ def test_parse_ignores_subscribe_ack() -> None:
         )
         is None
     )
+
+
+def test_parse_none_raw() -> None:
+    assert parse_pubsub_message(None, channel_prefix="") is None
+
+
+def test_coerce_data_encodes_non_str_bytes() -> None:
+    from async_redis_client.adapters.redis._pubsub_helpers import coerce_data
+
+    raw = {
+        "type": "message",
+        "channel": "events",
+        "data": 99,
+    }
+    msg = parse_pubsub_message(raw, channel_prefix="")
+    assert msg is not None
+    assert msg.data == coerce_data(99)
+    assert msg.data == b"99"

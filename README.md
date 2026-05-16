@@ -225,6 +225,18 @@ uv run pytest
 
 More design notes and module layout: [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) and [docs/PLAN.md](docs/PLAN.md).
 
+## LLM context (`llm_context/`)
+
+Compact **YAML** files for agents and LLMs working on ports and adapters (token-efficient, structured facts). Start with each folder’s **`INDEX.yaml`**, then open the file for the class you are editing.
+
+| Location | Covers |
+|----------|--------|
+| [`src/async_redis_client/ports/llm_context/`](src/async_redis_client/ports/llm_context/) | `CacheSyncPort`, `CacheAsyncPort`, `PubSubSyncPort`, `PubSubAsyncPort` (+ subscription ports) |
+| [`src/async_redis_client/adapters/redis/llm_context/`](src/async_redis_client/adapters/redis/llm_context/) | `RedisCache*Adapter`, `RedisPubSub*Adapter` |
+| [`src/async_redis_client/adapters/memory/llm_context/`](src/async_redis_client/adapters/memory/llm_context/) | `MemoryCache*Adapter`, `MemoryPubSub*Adapter` |
+
+Naming: `cache_sync.yaml` ↔ sync cache port/adapter; `pubsub_async.yaml` ↔ async pub/sub. Files list **imports**, **invariants**, **Redis vs memory differences**, **lifecycle**, **errors**, and **tests**. Typed messaging (`PubSubProducer*` / `PubSubConsumer*`) is summarized in the pubsub port YAML and in [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md)—there is no separate `messaging/llm_context/`.
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).

@@ -56,6 +56,63 @@ async def test_async_producer_consumer_with_dependencies() -> None:
 
 
 @pytest.mark.asyncio
+async def test_async_consumer_stop_event_max_messages() -> None:
+    bus = MemoryPubSubAsyncAdapter()
+    seen: list[int] = []
+
+    async def on_ping(msg: Ping) -> None:
+        seen.append(1)
+
+    consumer = PubSubConsumerAsync(bus, "ping", Ping, on_ping)
+    producer = PubSubProducerAsync(bus, "ping", Ping)
+
+    task = asyncio.create_task(consumer.run(max_messages=2))
+    await asyncio.sleep(0.05)
+    await producer.publish(Ping(text="a"))
+    await producer.publish(Ping(text="b"))
+    await producer.publish(Ping(text="c"))
+    await asyncio.wait_for(task, timeout=2.0)
+    assert len(seen) == 2
+
+
+@pytest.mark.asyncio
+async def test_async_consumer_stop_event_polls_until_set() -> None:
+    bus = MemoryPubSubAsyncAdapter()
+    stop = asyncio.Event()
+
+    async def on_ping(_: Ping) -> None:
+        pass
+
+    consumer = PubSubConsumerAsync(bus, "idle", Ping, on_ping)
+    task = asyncio.create_task(consumer.run(stop_event=stop))
+    await asyncio.sleep(0.6)
+    stop.set()
+    await asyncio.wait_for(task, timeout=2.0)
+
+
+@pytest.mark.asyncio
+async def test_async_consumer_stop_event_with_max_messages() -> None:
+    bus = MemoryPubSubAsyncAdapter()
+    stop = asyncio.Event()
+    seen: list[str] = []
+
+    async def on_ping(msg: Ping) -> None:
+        seen.append(msg.text)
+
+    consumer = PubSubConsumerAsync(bus, "ping", Ping, on_ping)
+    producer = PubSubProducerAsync(bus, "ping", Ping)
+
+    task = asyncio.create_task(
+        consumer.run(stop_event=stop, max_messages=2),
+    )
+    await asyncio.sleep(0.05)
+    await producer.publish(Ping(text="a"))
+    await producer.publish(Ping(text="b"))
+    await asyncio.wait_for(task, timeout=2.0)
+    assert seen == ["a", "b"]
+
+
+@pytest.mark.asyncio
 async def test_async_consumer_stop_event() -> None:
     bus = MemoryPubSubAsyncAdapter()
     stop = asyncio.Event()

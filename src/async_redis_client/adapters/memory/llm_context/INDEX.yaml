@@ -1,0 +1,8 @@
+purpose: in-process adapters for unit tests and local dev (no Redis/Fernet).
+ports: ../ports/llm_context/
+files:
+  cache_sync.yaml: MemoryCacheSyncAdapter
+  cache_async.yaml: MemoryCacheAsyncAdapter  # lock + delegate to sync inner
+  pubsub_sync.yaml: MemoryPubSubSyncAdapter + subscription
+  pubsub_async.yaml: MemoryPubSubAsyncAdapter + subscription
+hub: _pubsub_hub.py  # process-local fan-out

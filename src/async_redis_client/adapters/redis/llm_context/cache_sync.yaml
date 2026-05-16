@@ -1,0 +1,32 @@
+symbol: RedisCacheSyncAdapter
+kind: adapter
+protocol: CacheSyncPort
+module: async_redis_client.adapters.redis.sync_adapter
+file: adapters/redis/sync_adapter.py
+import: from async_redis_client import RedisCacheSyncAdapter
+client: redis.Redis | redis.cluster.RedisCluster
+init:
+  client: RedisSyncClient  # required inject
+  fernet_key: bytes|None  # else CACHE_FERNET_KEY env
+  fernet_key_secondary: bytes|None  # rotation decrypt only
+  namespace: str  # default ""
+  key_prefix: str
+  owns_client: false  # true when from_*_url
+factories:
+  from_standalone_url: {url, fernet_*, namespace, key_prefix, **redis_kwargs} -> owns_client=True
+  from_cluster_url: same with RedisCluster
+physical_key: "namespace + key_prefix + logical_key"
+storage:
+  json: Fernet(encrypt_json_tree) over Pydantic JSON bytes
+  model: Fernet(encrypt_bytes(dump_model))
+  counters: plaintext INCRBY; use dedicated prefix e.g. counter:
+  decrypt: primary Fernet then secondary if configured
+lifecycle:
+  context: "with adapter:"
+  close: closes client if owns_client; then CacheClosedError on ops
+  inject: caller closes redis client when owns_client=False
+cluster:
+  set_many|get_many: pipeline/MGET; keys must share hash slot — use {tag} in prefix/keys
+api: implements all CacheSyncPort methods  # see ports/llm_context/cache_sync.yaml
+errors: [CacheClosedError, CacheKeyNotFoundError, DecryptionError, SerializationError]
+tests: [tests/test_redis_sync_adapter.py, tests/test_redis_e2e.py, tests/test_redis_helpers.py]

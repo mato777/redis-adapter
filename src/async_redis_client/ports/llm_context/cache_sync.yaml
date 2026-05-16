@@ -1,0 +1,33 @@
+symbol: CacheSyncPort
+aliases: [SyncCachePort]
+kind: protocol
+sync: true
+module: async_redis_client.ports.sync_cache_port
+file: ports/sync_cache_port.py
+import: from async_redis_client import CacheSyncPort
+implements:
+  - RedisCacheSyncAdapter
+  - MemoryCacheSyncAdapter
+role: domain/services type hint; composition root injects adapter
+lifecycle:
+  close: "()->None; Redis: closes client if owns_client; memory: no-op"
+  after_close: CacheClosedError on Redis when owns_client was True
+api:
+  - {n: get, sig: "(key)->JsonValue|None", miss: null, hit_errors: [DecryptionError, SerializationError]}
+  - {n: get_or_raise_if_missing, sig: "(key)->JsonValue", miss: CacheKeyNotFoundError, note: "JSON null is present"}
+  - {n: set, sig: "(key,value,ttl_seconds=None)->None", aliases: [set_json]}
+  - {n: get_json, alias_of: get}
+  - {n: set_model, sig: "(key,BaseModel,ttl?)->None"}
+  - {n: get_as_model, sig: "(key,type[T])->T|None"}
+  - {n: delete, ret: int}
+  - {n: exists, ret: bool}
+  - {n: incr|decr|incrby, note: plaintext integer keys only; never mix with encrypted JSON on same key}
+  - {n: set_many, sig: "(mapping,ttl?)->None", cluster: "all logical keys same hash slot"}
+  - {n: get_many, sig: "(keys)->dict[str,JsonValue|None]", cluster: same slot rule}
+types: {JsonValue: pydantic.JsonValue, models: pydantic.BaseModel}
+invariants:
+  - logical key passed to port; adapters prepend namespace+key_prefix
+  - Redis: JSON/model values Fernet-encrypted; counters plaintext
+  - Memory: no encryption/TTL; ttl_seconds ignored
+errors: [CacheError, CacheClosedError, CacheKeyNotFoundError, DecryptionError, SerializationError]
+tests: [tests/test_cache_port_compat.py, tests/test_redis_sync_adapter.py, tests/test_memory_sync_adapter.py]

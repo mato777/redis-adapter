@@ -1,0 +1,11 @@
+# LLM context index — read the matching *.yaml before editing port code or adapters.
+purpose: typing.Protocol contracts; app layer imports these only (no redis).
+files:
+  cache_sync.yaml: CacheSyncPort + alias SyncCachePort
+  cache_async.yaml: CacheAsyncPort + alias AsyncCachePort
+  pubsub_sync.yaml: PubSubSyncPort, PubSubSubscriptionSyncPort + alias SyncPubSubPort
+  pubsub_async.yaml: PubSubAsyncPort, PubSubSubscriptionAsyncPort + alias AsyncPubSubPort
+implementations:
+  cache: adapters/redis/llm_context/cache_*.yaml, adapters/memory/llm_context/cache_*.yaml
+  pubsub: adapters/redis/llm_context/pubsub_*.yaml, adapters/memory/llm_context/pubsub_*.yaml
+messaging: PubSubProducer*/PubSubConsumer* depend on pubsub ports only (not separate llm_context)

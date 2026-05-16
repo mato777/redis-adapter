@@ -177,6 +177,87 @@ def test_sync_get_many_set_many(sync_redis: RedisCacheSyncAdapter) -> None:
     assert out["missing"] is None
 
 
+def test_sync_empty_set_many_and_get_many(sync_redis: RedisCacheSyncAdapter) -> None:
+    sync_redis.set_many({})
+    assert sync_redis.get_many([]) == {}
+
+
+def test_sync_exists_and_incrby(sync_redis: RedisCacheSyncAdapter) -> None:
+    assert sync_redis.exists("nope") is False
+    sync_redis.set_json("nope", 1)
+    assert sync_redis.exists("nope") is True
+    assert sync_redis.incrby("counter:x", 5) == 5
+
+
+def test_sync_get_as_model_missing(sync_redis: RedisCacheSyncAdapter) -> None:
+    class Item(BaseModel):
+        sku: str
+
+    assert sync_redis.get_as_model("missing-model", Item) is None
+
+
+def test_sync_set_model_without_ttl(sync_redis: RedisCacheSyncAdapter) -> None:
+    class Item(BaseModel):
+        sku: str
+
+    sync_redis.set_model("plain", Item(sku="z"))
+    got = sync_redis.get_as_model("plain", Item)
+    assert got is not None
+    assert got.sku == "z"
+
+
+def test_sync_set_model_with_ttl(sync_redis: RedisCacheSyncAdapter) -> None:
+    class Item(BaseModel):
+        sku: str
+
+    sync_redis.set_model("ttl-item", Item(sku="t"), ttl_seconds=30)
+    got = sync_redis.get_as_model("ttl-item", Item)
+    assert got is not None
+    assert got.sku == "t"
+    assert sync_redis._client.ttl(sync_redis._full_key("ttl-item")) > 0  # type: ignore[attr-defined]
+
+
+def test_sync_delete(sync_redis: RedisCacheSyncAdapter) -> None:
+    sync_redis.set_json("del-me", 1)
+    assert sync_redis.delete("del-me") == 1
+    assert sync_redis.get_json("del-me") is None
+
+
+def test_sync_from_standalone_url(
+    fernet_key: bytes, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import fakeredis
+
+    from async_redis_client.adapters.redis import sync_adapter as mod
+
+    fake = fakeredis.FakeRedis(decode_responses=False)
+    monkeypatch.setattr(mod.Redis, "from_url", lambda url, **kw: fake)
+    adapter = RedisCacheSyncAdapter.from_standalone_url(
+        "redis://localhost/1",
+        fernet_key=fernet_key,
+        namespace="ns:",
+    )
+    adapter.set_json("k", 1)
+    assert adapter.get_json("k") == 1
+
+
+def test_sync_from_cluster_url(
+    fernet_key: bytes, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import fakeredis
+
+    from async_redis_client.adapters.redis import sync_adapter as mod
+
+    fake = fakeredis.FakeRedis(decode_responses=False)
+    monkeypatch.setattr(mod.RedisCluster, "from_url", lambda url, **kw: fake)
+    adapter = RedisCacheSyncAdapter.from_cluster_url(
+        "redis://localhost:7000",
+        fernet_key=fernet_key,
+    )
+    adapter.set_json("c", 2)
+    assert adapter.get_json("c") == 2
+
+
 def test_memory_adapter_json_and_counter() -> None:
     mem = MemoryCacheSyncAdapter()
     mem.set_json("x", [1, 2])

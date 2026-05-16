@@ -1,0 +1,13 @@
+symbol: RedisPubSubAsyncAdapter
+kind: adapter
+protocol: PubSubAsyncPort
+module: async_redis_client.adapters.redis.pubsub_async_adapter
+file: adapters/redis/pubsub_async_adapter.py
+import: from async_redis_client import RedisPubSubAsyncAdapter
+parity: adapters/redis/llm_context/pubsub_sync.yaml
+diff:
+  - async publish/subscribe/psubscribe/close
+  - subscription close awaits pubsub.aclose()
+  - adapter aclose alias
+subscription_class: RedisPubSubSubscriptionAsyncAdapter
+tests: [tests/test_redis_pubsub_async_adapter.py, tests/test_pubsub_e2e.py]
