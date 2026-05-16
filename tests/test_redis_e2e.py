@@ -72,6 +72,31 @@ def redis_url(container: RedisContainer) -> str:
     return f"redis://{host}:{port}/0"
 
 
+def test_e2e_sync_namespace_only(
+    redis_container_session: RedisContainer,
+    fernet_key: bytes,
+) -> None:
+    namespace = f"e2e-ns:{uuid.uuid4().hex}:"
+    client = redis_container_session.get_client(decode_responses=False)
+    try:
+        cache = RedisCacheSyncAdapter(
+            client, fernet_key=fernet_key, namespace=namespace
+        )
+        cache.set_json("k", {"v": 1})
+        raw = client.get(cache._full_key("k"))
+        assert raw is not None
+        assert cache.get_json("k") == {"v": 1}
+
+        other = RedisCacheSyncAdapter(
+            client,
+            fernet_key=fernet_key,
+            namespace=f"e2e-other:{uuid.uuid4().hex}:",
+        )
+        assert other.get_json("k") is None
+    finally:
+        client.close()
+
+
 def test_e2e_sync_json_roundtrip(redis_sync_adapter: RedisCacheSyncAdapter) -> None:
     redis_sync_adapter.set_json("k", {"a": [1, 2, 3], "b": "x"})
     assert redis_sync_adapter.get_json("k") == {"a": [1, 2, 3], "b": "x"}
@@ -138,6 +163,38 @@ def test_e2e_sync_secondary_fernet_decrypts(
         assert reader.get_json("rotated") == {"phase": "old"}
     finally:
         client.close()
+
+
+async def test_e2e_async_namespace_only(
+    redis_container_session: RedisContainer,
+    fernet_key: bytes,
+) -> None:
+    namespace = f"e2e-ns:{uuid.uuid4().hex}:"
+    url = redis_url(redis_container_session)
+    cache = RedisCacheAsyncAdapter.from_standalone_url(
+        url,
+        fernet_key=fernet_key,
+        namespace=namespace,
+        decode_responses=False,
+    )
+    try:
+        await cache.set_json("k", {"ok": True})
+        raw = await cache._client.get(cache._full_key("k"))
+        assert raw is not None
+        assert await cache.get_json("k") == {"ok": True}
+
+        other = RedisCacheAsyncAdapter.from_standalone_url(
+            url,
+            fernet_key=fernet_key,
+            namespace=f"e2e-other:{uuid.uuid4().hex}:",
+            decode_responses=False,
+        )
+        try:
+            assert await other.get_json("k") is None
+        finally:
+            await other.close()
+    finally:
+        await cache.close()
 
 
 async def test_e2e_async_json_roundtrip(
