@@ -1,7 +1,7 @@
 [project]
 name = "async-redis-client"
-version = "0.1.0"
-description = "Hexagonal cache library with sync/async Redis adapters, Fernet encryption, and Pydantic JSON."
+version = "0.2.0"
+description = "Hexagonal cache and pub/sub library with sync/async Redis adapters, Fernet encryption, and Pydantic JSON."
 readme = "README.md"
 authors = [
     { name = "mato777", email = "matias@landjourney.ai" }
@@ -9,7 +9,7 @@ authors = [
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
-keywords = ["redis", "cache", "async", "fernet", "pydantic", "hexagonal"]
+keywords = ["redis", "cache", "pubsub", "async", "fernet", "pydantic", "hexagonal"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -95,7 +95,7 @@ extend-select = [
 ignore = []
 
 [tool.ruff.lint.isort]
-known-first-party = ["async_redis_client"]
+known-first-party = ["async_redis_client", "async_redis_client.schemas"]
 
 [tool.ty.environment]
 python-version = "3.11"
@@ -114,4 +114,5 @@ include = [
 invalid-argument-type = "ignore"
 not-iterable = "ignore"
 unsupported-operator = "ignore"
+unresolved-attribute = "ignore"
 unused-ignore-comment = "ignore"

@@ -1,8 +1,20 @@
-"""Stable cache-related exceptions for adapters and optional domain handling."""
+"""Stable cache- and pub/sub-related exceptions for adapters and domain code."""
 
 
 class CacheError(Exception):
     """Base error for cache operations (configuration, corrupted payloads, etc.)."""
+
+
+class PubSubError(Exception):
+    """Base error for pub/sub operations."""
+
+
+class PubSubClosedError(PubSubError):
+    """Raised when a pub/sub operation runs after the adapter or subscription is closed."""
+
+
+class PubSubSerializationError(PubSubError):
+    """Raised when a pub/sub payload fails Pydantic/dataclass JSON validation."""
 
 
 class CacheClosedError(CacheError):
@@ -24,4 +36,4 @@ class DecryptionError(CacheError):
 
 
 class SerializationError(CacheError):
-    """Raised when JSON/model validation fails after decrypt."""
+    """Raised when JSON/model validation fails after cache decrypt."""

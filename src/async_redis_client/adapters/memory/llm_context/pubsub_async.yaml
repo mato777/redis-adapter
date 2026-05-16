@@ -1,0 +1,13 @@
+symbol: MemoryPubSubAsyncAdapter
+kind: adapter
+protocol: PubSubAsyncPort
+module: async_redis_client.adapters.memory.pubsub_async_adapter
+file: adapters/memory/pubsub_async_adapter.py
+import: from async_redis_client import MemoryPubSubAsyncAdapter
+hub: AsyncMemoryPubSubHub
+parity: adapters/memory/llm_context/pubsub_sync.yaml
+diff:
+  - asyncio.Queue; get_message uses wait_for
+  - hub not thread-safe — one event loop per adapter
+subscription: MemoryPubSubSubscriptionAsyncAdapter
+tests: [tests/test_memory_pubsub_adapter.py, tests/test_messaging_e2e.py]

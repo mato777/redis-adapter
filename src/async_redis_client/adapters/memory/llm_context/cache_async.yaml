@@ -1,0 +1,11 @@
+symbol: MemoryCacheAsyncAdapter
+kind: adapter
+protocol: CacheAsyncPort
+module: async_redis_client.adapters.memory.async_adapter
+file: adapters/memory/async_adapter.py
+import: from async_redis_client import MemoryCacheAsyncAdapter
+impl: delegates to MemoryCacheSyncAdapter behind asyncio.Lock
+init: {namespace, key_prefix}  # same as sync
+diff_vs_redis: see adapters/memory/llm_context/cache_sync.yaml
+parity: all CacheAsyncPort methods async with lock
+tests: [tests/test_memory_async_adapter.py]

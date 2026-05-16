@@ -1,0 +1,18 @@
+symbol: MemoryPubSubSyncAdapter
+kind: adapter
+protocol: PubSubSyncPort
+module: async_redis_client.adapters.memory.pubsub_sync_adapter
+file: adapters/memory/pubsub_sync_adapter.py
+import: from async_redis_client import MemoryPubSubSyncAdapter
+init: {channel_prefix: ""}
+hub: MemoryPubSubHub  # _pubsub_hub.py
+subscription: MemoryPubSubSubscriptionSyncAdapter  # queue.Queue fan-out
+diff_vs_redis:
+  - process-local only; publish returns subscriber count from hub
+  - subscribe(*channels): len==1 else ValueError
+  - psubscribe(*patterns): len==1 else ValueError
+  - unsubscribe() with no args closes subscription
+get_message: queue.get(timeout); Empty -> None
+listen: blocks until None sentinel
+close: adapter sets _closed; does not drain hub
+tests: [tests/test_memory_pubsub_adapter.py, tests/test_messaging_producer_consumer.py]

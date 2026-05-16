@@ -1,0 +1,19 @@
+symbol: CacheAsyncPort
+aliases: [AsyncCachePort]
+kind: protocol
+sync: false
+module: async_redis_client.ports.async_cache_port
+file: ports/async_cache_port.py
+import: from async_redis_client import CacheAsyncPort
+implements:
+  - RedisCacheAsyncAdapter
+  - MemoryCacheAsyncAdapter
+role: async domain/services; mirror of CacheSyncPort with async def
+parity: ports/llm_context/cache_sync.yaml
+lifecycle:
+  close: "async; Redis aclose alias on adapter"
+  after_close: CacheClosedError when adapter owns client
+api: same as cache_sync.yaml but every method is async def
+invariants: same as cache_sync.yaml
+errors: same as cache_sync.yaml
+tests: [tests/test_redis_async_adapter.py, tests/test_memory_async_adapter.py]

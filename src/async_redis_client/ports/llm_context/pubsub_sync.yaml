@@ -1,0 +1,30 @@
+symbol: PubSubSyncPort
+aliases: [SyncPubSubPort]
+kind: protocol
+sync: true
+module: async_redis_client.ports.sync_pubsub_port
+file: ports/sync_pubsub_port.py
+import: from async_redis_client import PubSubSyncPort, PubSubSubscriptionSyncPort
+implements:
+  bus: [RedisPubSubSyncAdapter, MemoryPubSubSyncAdapter]
+  subscription: [RedisPubSubSubscriptionSyncAdapter, MemoryPubSubSubscriptionSyncAdapter]
+role: low-level fire-and-forget pub/sub; not durable queues/streams
+wire_type: PubSubMessage  # schemas/pubsub_message.py — channel, data, pattern?
+PubSubSyncPort:
+  publish: "(channel, str|bytes)->int  # subscriber count"
+  subscribe: "(*channels)->PubSubSubscriptionSyncPort"
+  psubscribe: "(*patterns)->PubSubSubscriptionSyncPort"
+  close: "()->None"
+PubSubSubscriptionSyncPort:
+  get_message: "(timeout=1.0)->PubSubMessage|None"
+  listen: "Iterator[PubSubMessage]"
+  unsubscribe: "(*channels)->None  # empty args = all"
+  punsubscribe: "(*patterns)->None"
+  close: "()->None"
+invariants:
+  - logical channel names; adapters apply channel_prefix
+  - close every subscription before closing bus (Redis)
+  - Memory subscribe/psubscribe: exactly ONE channel or pattern per call
+typed_layer: PubSubProducerSync / PubSubConsumerSync use this port + JSON codec
+errors: [PubSubError, PubSubClosedError, PubSubSerializationError]
+tests: [tests/test_redis_pubsub_sync_adapter.py, tests/test_memory_pubsub_adapter.py, tests/test_pubsub_e2e.py]

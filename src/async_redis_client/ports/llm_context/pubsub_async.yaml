@@ -1,0 +1,23 @@
+symbol: PubSubAsyncPort
+aliases: [AsyncPubSubPort]
+kind: protocol
+sync: false
+module: async_redis_client.ports.async_pubsub_port
+file: ports/async_pubsub_port.py
+import: from async_redis_client import PubSubAsyncPort, PubSubSubscriptionAsyncPort
+implements:
+  bus: [RedisPubSubAsyncAdapter, MemoryPubSubAsyncAdapter]
+  subscription: [RedisPubSubSubscriptionAsyncAdapter, MemoryPubSubSubscriptionAsyncAdapter]
+parity: ports/llm_context/pubsub_sync.yaml
+PubSubAsyncPort:
+  publish: async
+  subscribe|psubscribe: async -> subscription port
+  close: async; Redis adapter aclose alias
+PubSubSubscriptionAsyncPort:
+  get_message: async
+  listen: AsyncIterator[PubSubMessage]
+  unsubscribe|punsubscribe|close: async
+invariants: same as pubsub_sync.yaml; async memory hub not thread-safe
+typed_layer: PubSubProducerAsync / PubSubConsumerAsync
+errors: [PubSubError, PubSubClosedError, PubSubSerializationError]
+tests: [tests/test_redis_pubsub_async_adapter.py, tests/test_memory_pubsub_adapter.py, tests/test_pubsub_e2e.py]

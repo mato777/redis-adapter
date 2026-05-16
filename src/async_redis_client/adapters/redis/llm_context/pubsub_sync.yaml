@@ -1,0 +1,22 @@
+symbol: RedisPubSubSyncAdapter
+kind: adapter
+protocol: PubSubSyncPort
+module: async_redis_client.adapters.redis.pubsub_sync_adapter
+file: adapters/redis/pubsub_sync_adapter.py
+import: from async_redis_client import RedisPubSubSyncAdapter
+client: redis.Redis | redis.cluster.RedisCluster
+init: {client, channel_prefix: "", owns_client: false}
+factories: [from_standalone_url, from_cluster_url]
+publish: uses main Redis client
+subscribe|psubscribe: opens new redis.client.PubSub per call; must subscription.close()
+subscription_class: RedisPubSubSubscriptionSyncAdapter
+  get_message: loops parse_pubsub_message; skips subscribe acks; timeout monotonic deadline
+  listen: filters via parse_pubsub_message
+  channel_prefix: stripped on PubSubMessage.channel for logical names
+physical_channel: channel_prefix + logical_channel  # _pubsub_helpers.full_channel
+lifecycle:
+  - close each subscription before adapter.close()
+  - owns_client: with adapter or close() shuts down Redis
+decode_responses: pass in from_url kwargs if you want str data on wire
+memory_diff: Redis allows multi-channel subscribe; memory allows one
+tests: [tests/test_redis_pubsub_sync_adapter.py, tests/test_pubsub_helpers.py, tests/test_pubsub_e2e.py]

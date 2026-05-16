@@ -1,6 +1,6 @@
 # async-redis-client
 
-A small **Ports and Adapters (hexagonal)** cache library for Python: application code depends on **`CacheSyncPort` / `CacheAsyncPort`** (`typing.Protocol`); **Redis** (sync or asyncio) **or an in-memory implementation** satisfies those protocols behind the scenes.
+A small **Ports and Adapters (hexagonal)** cache and **pub/sub** library for Python: application code depends on **`CacheSyncPort` / `CacheAsyncPort`** and **`PubSubSyncPort` / `PubSubAsyncPort`** (`typing.Protocol`); **Redis** (sync or asyncio) **or in-memory implementations** satisfy those protocols behind the scenes.
 
 **Features:**
 
@@ -10,6 +10,7 @@ A small **Ports and Adapters (hexagonal)** cache library for Python: application
 - **Plaintext integer counters** (`incr`, `decr`, `incrby`)—keep counter keys separate from encrypted JSON keys (for example a `counter:` prefix).
 - **`set_many` / `get_many`** via pipeline/`MGET` semantics—on **Redis Cluster**, keys must land in the **same hash slot** (use hash tags in keys or `key_prefix`, e.g. `{tenant}:item:1`).
 - **Memory adapters** for fast tests and local use (`MemoryCacheSyncAdapter`, `MemoryCacheAsyncAdapter`).
+- **Sync and async pub/sub** (`RedisPubSubSyncAdapter`, `RedisPubSubAsyncAdapter`, memory counterparts) with optional **`channel_prefix`** (same idea as cache `key_prefix`).
 
 Requirements: **Python ≥ 3.11**, **redis-py ≥ 7.4** (stable `redis` on PyPI), **cryptography**, **pydantic ≥ 2**. Example and e2e Docker images use **Redis 8** server (`redis:8-alpine`).
 
@@ -167,13 +168,53 @@ cache.set_json("x", {"n": 1})
 assert cache.get_json("x") == {"n": 1}
 ```
 
+### Pub/sub (async)
+
+```python
+import asyncio
+from async_redis_client import RedisPubSubAsyncAdapter
+
+async def main():
+    async with RedisPubSubAsyncAdapter.from_standalone_url(
+        "redis://localhost:6379/0", decode_responses=True
+    ) as bus:
+        sub = await bus.subscribe("events")
+        await bus.publish("events", "hello")
+        msg = await sub.get_message(timeout=2.0)
+        await sub.close()
+
+asyncio.run(main())
+```
+
+Sync: **`RedisPubSubSyncAdapter`** with **`subscribe`**, **`psubscribe`**, **`publish`**, and **`PubSubMessage`**.
+
+**Typed producer / consumer** (Pydantic or dataclass payloads, handler dependency injection):
+
+```python
+from async_redis_client import PubSubProducerAsync, PubSubConsumerAsync, RedisPubSubAsyncAdapter
+
+async def on_order(event: OrderCreated, db: Session) -> None:
+    ...
+
+async with RedisPubSubAsyncAdapter.from_standalone_url(url) as bus:
+    producer = PubSubProducerAsync(bus, "orders", OrderCreated)
+    consumer = PubSubConsumerAsync(bus, "orders", OrderCreated, on_order, db=session)
+    await producer.publish(OrderCreated(order_id=1, sku="X"))
+```
+
+See **`examples/pubsub_example.py`**.
+
+Consumers expect a **plain function** (first parameter = message); use `functools.partial` instead of bound methods. Handler or decode errors stop `run()`; there is no built-in retry. **`MemoryPubSub*Adapter`** allows one channel per `subscribe` (Redis allows several).
+
 ### Errors
 
-- **`CacheError`** — missing key / bootstrap issues (for example unset Fernet key).
-- **`DecryptionError`** — invalid Fernet token.
-- **`SerializationError`** — wraps Pydantic validation problems after decryption.
+- **`CacheError`** / **`PubSubError`** — configuration and adapter errors.
+- **`CacheClosedError`** / **`PubSubClosedError`** — use after close.
+- **`DecryptionError`** — invalid Fernet token on cache read.
+- **`SerializationError`** — Pydantic validation failure after cache decrypt.
+- **`PubSubSerializationError`** — invalid typed pub/sub JSON in consumers.
 
-Public exports are documented in **`async_redis_client.__init__.__all__`** (ports, adapters, errors, and **`SyncCachePort` / `AsyncCachePort`** aliases).
+Public exports are documented in **`async_redis_client.__init__.__all__`** (ports, adapters, errors, and **`SyncCachePort` / `AsyncCachePort` / `SyncPubSubPort` / `AsyncPubSubPort`** aliases).
 
 ## Development
 
@@ -183,6 +224,18 @@ uv run pytest
 ```
 
 More design notes and module layout: [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) and [docs/PLAN.md](docs/PLAN.md).
+
+## LLM context (`llm_context/`)
+
+Compact **YAML** files for agents and LLMs working on ports and adapters (token-efficient, structured facts). Start with each folder’s **`INDEX.yaml`**, then open the file for the class you are editing.
+
+| Location | Covers |
+|----------|--------|
+| [`src/async_redis_client/ports/llm_context/`](src/async_redis_client/ports/llm_context/) | `CacheSyncPort`, `CacheAsyncPort`, `PubSubSyncPort`, `PubSubAsyncPort` (+ subscription ports) |
+| [`src/async_redis_client/adapters/redis/llm_context/`](src/async_redis_client/adapters/redis/llm_context/) | `RedisCache*Adapter`, `RedisPubSub*Adapter` |
+| [`src/async_redis_client/adapters/memory/llm_context/`](src/async_redis_client/adapters/memory/llm_context/) | `MemoryCache*Adapter`, `MemoryPubSub*Adapter` |
+
+Naming: `cache_sync.yaml` ↔ sync cache port/adapter; `pubsub_async.yaml` ↔ async pub/sub. Files list **imports**, **invariants**, **Redis vs memory differences**, **lifecycle**, **errors**, and **tests**. Typed messaging (`PubSubProducer*` / `PubSubConsumer*`) is summarized in the pubsub port YAML and in [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md)—there is no separate `messaging/llm_context/`.
 
 ## License
 

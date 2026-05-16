@@ -1,0 +1,14 @@
+symbol: RedisCacheAsyncAdapter
+kind: adapter
+protocol: CacheAsyncPort
+module: async_redis_client.adapters.redis.async_adapter
+file: adapters/redis/async_adapter.py
+import: from async_redis_client import RedisCacheAsyncAdapter
+client: redis.asyncio.Redis | redis.asyncio.cluster.RedisCluster
+parity: adapters/redis/llm_context/cache_sync.yaml
+diff:
+  - all port methods async
+  - close awaits client.aclose(); aclose alias
+  - from_standalone_url / from_cluster_url use AsyncRedis*
+lifecycle: "async with adapter:" or await close()
+tests: [tests/test_redis_async_adapter.py, tests/test_redis_e2e.py]
