@@ -1,0 +1,23 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.idea/
+.vscode/
+
+# Local secrets (e.g. CACHE_FERNET_KEY); never commit
+.env
+.env.*
+
+# Virtual environments
+.venv
+
+# tooling / coverage artifacts
+.ruff_cache/
+htmlcov/
+.coverage
+
+.githooks/
